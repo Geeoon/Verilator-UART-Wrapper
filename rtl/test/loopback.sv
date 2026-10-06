@@ -18,7 +18,7 @@ module loopback #(
     parameter int DATA_BITS=8,
     parameter int RX_FIFO_SIZE=4,
     parameter int TX_FIFO_SIZE=4,
-    parameter int STOP_BITS=1,
+    parameter int STOP_BITS=1
 ) (
     input logic clk,
     input logic rst,
