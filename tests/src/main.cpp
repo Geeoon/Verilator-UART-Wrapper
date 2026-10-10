@@ -58,25 +58,44 @@ int main(int argc, char** argv) {
     Vtop_level* top = new Vtop_level{contextp};
 
     UartCtrl uart_controller;
-    
+
     top->clk = 0;
-    // reset
     top->rst = 1;
     top->write = 0;
     top->tx_frame = 0;
-    top->clk = !top->clk;
-    top->eval();
-    contextp->timeInc(CLOCK_PERIOD);
-    top->clk = !top->clk;
-    top->eval();
-    contextp->timeInc(CLOCK_PERIOD);
-    top->clk = !top->clk;
-    top->eval();
-    contextp->timeInc(CLOCK_PERIOD);
+
+    // advance the design by one clock cycle; when \p run_uart is set the
+    // wrapper samples the design's outputs and drives its inputs on the posedge
+    auto clock_cycle = [&](bool run_uart) {
+        top->clk = 1;
+        top->eval();
+        contextp->timeInc(CLOCK_PERIOD / 2);
+
+        if (run_uart) {
+            bool write;
+            unsigned char tx_frame;
+            uart_controller.process_uart(write, tx_frame,
+                                         static_cast<bool>(top->valid),
+                                         static_cast<unsigned char>(top->rx_frame));
+            top->write = write;
+            top->tx_frame = tx_frame;
+
+            unsigned char data;
+            if (uart_controller.receive_frame(&data)) {
+                std::cout << "Received 0x" << std::hex
+                          << static_cast<int>(data) << std::dec << std::endl;
+            }
+        }
+
+        top->clk = 0;
+        top->eval();
+        contextp->timeInc(CLOCK_PERIOD / 2);
+    };
+
+    // hold reset for a couple of cycles so the UART FIFOs start empty
+    clock_cycle(false);
+    clock_cycle(false);
     top->rst = 0;
-    top->clk = !top->clk;
-    top->eval();
-    contextp->timeInc(CLOCK_PERIOD);
 
     // queue up some bytes to send; the loopback testbench echoes them back
     uart_controller.transmit_frame('H');
@@ -88,26 +107,9 @@ int main(int argc, char** argv) {
     uart_controller.transmit_frame('\n');
 
     while (!contextp->gotFinish()) {
-        if ((contextp->time() % (CLOCK_PERIOD/2)) == 0) {
-            top->clk = !top->clk;
-        }
-        top->eval();
-        if ((contextp->time() % CLOCK_PERIOD) == (CLOCK_PERIOD/2)) { 
-            // posedge
-            bool write;
-            unsigned char tx_frame;
-            uart_controller.process_uart(write, tx_frame, static_cast<bool>(top->valid), static_cast<unsigned char>(top->rx_frame));
-            top->write = write;
-            top->tx_frame = tx_frame;
-
-            unsigned char data;
-            if (uart_controller.receive_frame(&data)) {
-                std::cout << "Received 0x" << std::hex << static_cast<int>(data) << std::dec << std::endl;
-            }
-        }
-
-        contextp->timeInc(1);
+        clock_cycle(true);
     }
+
     top->final();
     delete top;
     delete contextp;
