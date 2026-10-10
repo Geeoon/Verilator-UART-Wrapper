@@ -4,6 +4,9 @@
 #include <queue>
 #include <unistd.h>
 #include <fcntl.h>
+#include <csignal>
+#include <cerrno>
+#include <cstring>
 
 // in ns
 #define CLOCK_PERIOD 100
@@ -55,16 +58,23 @@ public:
 };
 
 int main(int argc, char** argv) {
-    int uart_fd = open("./uart/pty/uart", O_RDWR | O_NOCTTY);
+    // start.sh sets up this PTY with socat; attach a terminal (e.g. screen) to
+    // ./uart/pty/uart_wrapper to send/receive UART frames.
+    signal(SIGPIPE, SIG_IGN);
+    int uart_fd = open("./uart/pty/uart", O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (uart_fd < 0) {
-        std::cerr << "Failed to open UART PTY" << std::endl;
+        std::cerr << "Failed to open UART PTY: " << std::strerror(errno)
+                  << std::endl;
         return 1;
     }
+
     VerilatedContext* contextp = new VerilatedContext;
     contextp->commandArgs(argc, argv);
     Vtop_level* top = new Vtop_level{contextp};
 
     UartCtrl uart_controller;
+    // frames that still need to be pushed out to the PTY
+    std::queue<unsigned char> pty_tx_fifo;
 
     top->clk = 0;
     top->rst = 1;
@@ -89,8 +99,7 @@ int main(int argc, char** argv) {
 
             unsigned char data;
             if (uart_controller.receive_frame(&data)) {
-                std::cout << "Received 0x" << std::hex
-                          << static_cast<int>(data) << std::dec << std::endl;
+                pty_tx_fifo.push(data);
             }
         }
 
@@ -104,12 +113,34 @@ int main(int argc, char** argv) {
     clock_cycle(false);
     top->rst = 0;
 
-    // start UART transmission thread
-
     while (!contextp->gotFinish()) {
+        // PTY -> UART: queue everything the terminal has sent us
+        unsigned char rx_buffer[1024];
+        ssize_t count;
+        while ((count = read(uart_fd, rx_buffer, sizeof(rx_buffer))) > 0) {
+            for (ssize_t i = 0; i < count; ++i) {
+                uart_controller.transmit_frame(rx_buffer[i]);
+            }
+        }
+
+        // UART -> PTY: forward received frames to the terminal
+        while (!pty_tx_fifo.empty()) {
+            ssize_t written = write(uart_fd, &pty_tx_fifo.front(), 1);
+            if (written < 0) {
+                // the terminal isn't ready to accept more right now; try again
+                // on the next iteration
+                if (errno == EAGAIN || errno == EWOULDBLOCK) break;
+                std::cerr << "Failed to write to UART PTY: "
+                          << std::strerror(errno) << std::endl;
+                break;
+            }
+            pty_tx_fifo.pop();
+        }
+
         clock_cycle(true);
     }
 
+    close(uart_fd);
     top->final();
     delete top;
     delete contextp;
