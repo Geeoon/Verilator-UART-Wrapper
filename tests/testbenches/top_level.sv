@@ -36,10 +36,12 @@ module top_level #(
     ) uart_wrapper_m (
         .clk,
         .rst,
-        .read(0),
+        // drain the RX FIFO as soon as a frame is available so the C++ wrapper
+        // observes each received frame exactly once
+        .read(~empty),
         .write,
         .tx_data(tx_frame),
-        .uart_rx(1),
+        .uart_rx(uart_rx),
 
         .uart_tx,
         .rx_data(rx_frame),
@@ -69,7 +71,9 @@ module top_level #(
             $display("write: ", write);
             $display("uart_tx: ", uart_tx);
             $display("uart_rx: ", uart_rx);
-            @(posedge clk);
+            // run long enough for the loopback to transmit and receive the
+            // frames queued by the C++ wrapper before ending the simulation
+            repeat (5000) @(posedge clk);
         // end
         $finish;
     end  // initial

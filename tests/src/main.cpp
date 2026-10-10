@@ -42,8 +42,12 @@ public:
             write = 0;
             tx_frame = 0;
         } else {
+            // hand the next frame to the hardware and consume it so it is only
+            // written once. The frame is held on write/tx_frame for one clock
+            // cycle, which is when the UART samples it.
             write = 1;
             tx_frame = uart_tx_fifo.front();
+            uart_tx_fifo.pop();
         }
     }
 };
@@ -74,6 +78,15 @@ int main(int argc, char** argv) {
     top->eval();
     contextp->timeInc(CLOCK_PERIOD);
 
+    // queue up some bytes to send; the loopback testbench echoes them back
+    uart_controller.transmit_frame('H');
+    uart_controller.transmit_frame('e');
+    uart_controller.transmit_frame('l');
+    uart_controller.transmit_frame('l');
+    uart_controller.transmit_frame('o');
+    uart_controller.transmit_frame('\r');
+    uart_controller.transmit_frame('\n');
+
     while (!contextp->gotFinish()) {
         if ((contextp->time() % (CLOCK_PERIOD/2)) == 0) {
             top->clk = !top->clk;
@@ -89,10 +102,8 @@ int main(int argc, char** argv) {
 
             unsigned char data;
             if (uart_controller.receive_frame(&data)) {
-                std::cout << "Received 0x" << static_cast<int>(data) << std::endl;
+                std::cout << "Received 0x" << std::hex << static_cast<int>(data) << std::dec << std::endl;
             }
-            // std::cout << "rx (" << static_cast<bool>(top->valid) << "): " <<
-            // "0x" << std::hex << static_cast<int>(top->rx_frame) << std::dec << std::endl;
         }
 
         contextp->timeInc(1);
