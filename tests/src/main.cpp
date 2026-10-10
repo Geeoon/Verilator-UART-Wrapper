@@ -2,6 +2,8 @@
 #include "verilated.h"
 #include <iostream>
 #include <queue>
+#include <unistd.h>
+#include <fcntl.h>
 
 // in ns
 #define CLOCK_PERIOD 100
@@ -53,6 +55,11 @@ public:
 };
 
 int main(int argc, char** argv) {
+    int uart_fd = open("./uart/pty/uart", O_RDWR | O_NOCTTY);
+    if (uart_fd < 0) {
+        std::cerr << "Failed to open UART PTY" << std::endl;
+        return 1;
+    }
     VerilatedContext* contextp = new VerilatedContext;
     contextp->commandArgs(argc, argv);
     Vtop_level* top = new Vtop_level{contextp};
@@ -97,14 +104,7 @@ int main(int argc, char** argv) {
     clock_cycle(false);
     top->rst = 0;
 
-    // queue up some bytes to send; the loopback testbench echoes them back
-    uart_controller.transmit_frame('H');
-    uart_controller.transmit_frame('e');
-    uart_controller.transmit_frame('l');
-    uart_controller.transmit_frame('l');
-    uart_controller.transmit_frame('o');
-    uart_controller.transmit_frame('\r');
-    uart_controller.transmit_frame('\n');
+    // start UART transmission thread
 
     while (!contextp->gotFinish()) {
         clock_cycle(true);

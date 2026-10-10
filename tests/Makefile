@@ -27,9 +27,9 @@ $(WAVEFORM_DIR)/%.vcd: $(HDL_FILES) $(TB_FILES)
 	$(VERILATOR_BUILD_DIR)/$*/V$*
 
 $(UART_DIR)/uart_sim: $(HDL_FILES) $(TB_FILES)
-	mkdir -p $(UART_DIR)
+	mkdir -p $(UART_DIR)/pty
 	verilator $(VERILATOR_CPP_FLAGS) -Mdir $(UART_DIR)/$* $(CPP_SRC_DIR)/main.cpp --top-module top_level $(HDL_FILES) $(TB_FILES)
-	$(UART_DIR)/Vtop_level
+	./start.sh
 
 .PHONY: clean all
 clean:
