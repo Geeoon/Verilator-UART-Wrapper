@@ -64,17 +64,7 @@ module top_level #(
     );
     
     initial begin
-        // forever begin
-            $display("rst: ", rst);
-            $display("empty: ", empty);
-            $display("full: ", full);
-            $display("write: ", write);
-            $display("uart_tx: ", uart_tx);
-            $display("uart_rx: ", uart_rx);
-            // run long enough for the loopback to transmit and receive the
-            // frames queued by the C++ wrapper before ending the simulation
-            repeat (5000) @(posedge clk);
-        // end
+        forever  @(posedge clk);
         $finish;
     end  // initial
 
