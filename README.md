@@ -1,15 +1,9 @@
 # Verilator-UART-Wrapper
-The goal of this project is to allow serial terminals, like `screen` to interact with Verilator designs.
+## Usage
+Replace the `dut` in top level with your design.  Connect `uart_tx` with your DUT's receive line, and connect `uart_rx` with your DUT's transmit line.
 
-The general idea is this:
-* Create a PTY(s) on Linux
-* Have Verilator read from the PTY
-  * Have on thread listening for PTY characters
-  * Have another thread running the design
-* Convert the PTY input into RX line signals
-* Have the wrapper read the TX line from the module and send it to the PTY
+Navigate to the `tests` directory.
 
-Questions:
-* Figure out how Verilator C/C++ wrapper works
-  * How does it handle multiple threads
-* Figure out how PTYs handle non-8-bit frames
+Run `make uart/uart_sim` to start the compile and start.  The design will run forever until Ctrl+C.
+
+Run `screen ./uart/pty/uart_wrapper`.  You now have a serial connection with your DUT.
