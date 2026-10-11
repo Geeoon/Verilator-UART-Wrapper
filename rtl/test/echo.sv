@@ -26,7 +26,7 @@ module echo #(
 
     output logic tx
 );
-    logic rx_data;
+    logic [DATA_BITS-1:0] rx_data;
     logic empty, full;
     uart #(
         .CLOCK_SPEED(CLOCK_SPEED),

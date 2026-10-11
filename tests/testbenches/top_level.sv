@@ -49,7 +49,7 @@ module top_level #(
         .full
     );
 
-    loopback #(
+    echo #(
         .CLOCK_SPEED(CLOCK_SPEED),
         .BAUD_RATE(BAUD_RATE),
         .DATA_BITS(DATA_BITS),
